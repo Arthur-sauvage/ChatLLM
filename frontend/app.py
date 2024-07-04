@@ -71,8 +71,7 @@ Here the chat history:
 Here the user message:
 {user_message}"""
 
-# Input section for user to modify the PRE_PROMPT
-with st.expander("Configure Chat Assistant"):
+with st.sidebar:
     llm_selected = st.selectbox("Select the LLM model", llm_propositions)
     selected_template_name = st.selectbox(
         "Select a prompt template:", list(PROMPTS_TEMPLATE.keys())
@@ -111,6 +110,7 @@ if "gpt" in llm_selected:
         openai_api_key=os.getenv("AZURE_OPENAI_API_KEY"),
         max_tokens=nb_max_tokens,
         streaming=True,
+        verbose=True,
         temperature=temperature,
         model_kwargs={"frequency_penalty": frequency_penalty},
     )
@@ -120,6 +120,8 @@ elif llm_selected == "Llama-3-8B-Instruct":
         endpoint_api_type=AzureMLEndpointApiType.serverless,
         endpoint_api_key=os.getenv("LLAMA_3_8B_API_KEY"),
         content_formatter=LlamaChatContentFormatter(),
+        streaming=True,
+        verbose=True,
         max_tokens=nb_max_tokens,
         temperature=temperature,
         model_kwargs={"frequency_penalty": frequency_penalty},
@@ -130,6 +132,8 @@ elif llm_selected == "Llama-3-70B-Instruct":
         endpoint_api_type=AzureMLEndpointApiType.serverless,
         endpoint_api_key=os.getenv("LLAMA_3_70B_API_KEY"),
         content_formatter=LlamaChatContentFormatter(),
+        streaming=True,
+        verbose=True,
         max_tokens=nb_max_tokens,
         temperature=temperature,
         model_kwargs={"frequency_penalty": frequency_penalty},
@@ -138,6 +142,8 @@ elif llm_selected == "Mistral Large":
     llm = ChatMistralAI(
         endpoint=os.getenv("MISTRAL_LARGE_ENDPOINT"),
         mistral_api_key=os.getenv("MISTRAL_LARGE_KEY"),
+        streaming=True,
+        verbose=True,
         max_tokens=nb_max_tokens,
         temperature=temperature,
         model_kwargs={"frequency_penalty": frequency_penalty},
@@ -146,6 +152,8 @@ elif llm_selected == "Mistral Small":
     llm = ChatMistralAI(
         endpoint=os.getenv("MISTRAL_SMALL_ENDPOINT"),
         mistral_api_key=os.getenv("MISTRAL_SMALL_KEY"),
+        streaming=True,
+        verbose=True,
         max_tokens=nb_max_tokens,
         temperature=temperature,
         model_kwargs={"frequency_penalty": frequency_penalty},
@@ -155,6 +163,8 @@ elif llm_selected == "AI21-Jamba-Instruct":
         model=os.getenv("AI21_MODEL"),
         api_key=os.getenv("AI21_API_KEY"),
         api_host=os.getenv("AI21_API_HOST"),
+        streaming=True,
+        verbose=True,
         max_tokens=nb_max_tokens,
         temperature=temperature,
         model_kwargs={"frequency_penalty": frequency_penalty},
@@ -165,21 +175,14 @@ elif llm_selected == "AI21-Jamba-Instruct":
 #         cohere_api_key=os.getenv("COHERE_API_KEY"),
 #         base_url=os.getenv("COHERE_BASE_URL"),
 #         model=os.getenv("COHERE_MODEL"),
+        # streaming=True,
+        # verbose=True,
 #     )
 
 
 prompt_template = ChatPromptTemplate.from_template(pre_prompt)
-chain = SequentialChain(
-    chains=[LLMChain(llm=llm, prompt=prompt_template, output_parser=StrOutputParser())],
-    input_variables=["chat_history", "user_message"],
-    verbose=False,
-)
+chain = prompt_template | llm | StrOutputParser()
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-
-# Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -206,9 +209,5 @@ if prompt := st.chat_input("Type your message here..."):
     # Display assistant response in chat message container
     with st.chat_message("assistant"):
         response_container = st.empty()  # Container for streaming response
-        response = ""
-        for response_chunk in chain.stream(data):
-            logging.info("response_chunk: %s", response_chunk)
-            response_container.markdown(response_chunk["text"])
-            response += response_chunk["text"]
+        response = st.write_stream = response_container.write_stream(chain.stream(data))
     st.session_state.messages.append({"role": "assistant", "content": response})
